@@ -251,6 +251,21 @@ class Hyperopt:
             self.current_best_loss = val["loss"]
             self.current_best_epoch = val
 
+            fn = HyperoptTools.get_strategy_filename(
+                self.config, self.hyperopter.get_strategy_name()
+            )
+            HyperoptTools.export_params(
+                self.current_best_epoch,
+                self.hyperopter.get_strategy_name(),
+                fn.with_suffix(".json"),
+            )
+            fn = fn.parent / f"{fn.stem}_epo{current:04d}{fn.suffix}"
+            HyperoptTools.export_params(
+                self.current_best_epoch,
+                self.hyperopter.get_strategy_name(),
+                fn.with_suffix(".json"),
+            )
+
         self._save_result(val)
 
     def _setup_logging_mp_workaround(self) -> None:

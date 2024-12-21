@@ -475,10 +475,9 @@ class Backtesting:
         # Special handling if high or low hit STOP_LOSS or ROI
         if exit_.exit_type in (
             ExitType.STOP_LOSS,
-            ExitType.TRAILING_STOP_LOSS,
             ExitType.LIQUIDATION,
         ):
-            return self._get_close_rate_for_stoploss(row, trade, exit_, trade_dur)
+            return trade.stop_loss
         elif exit_.exit_type == (ExitType.ROI):
             return self._get_close_rate_for_roi(row, trade, exit_, trade_dur)
         else:
