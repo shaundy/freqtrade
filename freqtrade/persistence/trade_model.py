@@ -19,6 +19,7 @@ from sqlalchemy import (
     Select,
     String,
     UniqueConstraint,
+    case,
     desc,
     func,
     select,
@@ -191,6 +192,7 @@ class Order(ModelBase):
         return (
             f"Order(id={self.id}, trade={self.ft_trade_id}, order_id={self.order_id}, "
             f"side={self.side}, filled={self.safe_filled}, price={self.safe_price}, "
+            f"amount={self.amount}, "
             f"status={self.status}, date={self.order_date_utc:{DATETIME_PRINT_FORMAT}})"
         )
 
@@ -268,6 +270,7 @@ class Order(ModelBase):
             "order_filled_timestamp": dt_ts_none(self.order_filled_utc),
             "ft_is_entry": self.ft_order_side == entry_side,
             "ft_order_tag": self.ft_order_tag,
+            "cost": self.cost if self.cost else 0,
         }
         if not minified:
             resp.update(
@@ -276,7 +279,6 @@ class Order(ModelBase):
                     "order_id": self.order_id,
                     "status": self.status,
                     "average": round(self.average, 8) if self.average else 0,
-                    "cost": self.cost if self.cost else 0,
                     "filled": self.filled,
                     "is_open": self.ft_is_open,
                     "order_date": (
@@ -598,6 +600,13 @@ class LocalTrade:
             o for o in self.orders if o.ft_order_side not in ["stoploss"] and o.ft_is_open
         ]
         return len(open_orders_wo_sl) > 0
+
+    @property
+    def has_open_position(self) -> bool:
+        """
+        True if there is an open position for this trade
+        """
+        return self.amount > 0
 
     @property
     def open_sl_orders(self) -> list[Order]:
@@ -1926,17 +1935,49 @@ class Trade(ModelBase, LocalTrade):
             start_date = datetime.now(timezone.utc) - timedelta(minutes=minutes)
             filters.append(Trade.close_date >= start_date)
 
-        pair_rates = Trade.session.execute(
+        pair_costs = (
             select(
                 Trade.pair,
-                func.sum(Trade.close_profit).label("profit_sum"),
+                func.sum(
+                    (
+                        func.coalesce(Order.filled, Order.amount)
+                        * func.coalesce(Order.average, Order.price, Order.ft_price)
+                    )
+                    / func.coalesce(Trade.leverage, 1)
+                ).label("cost_per_pair"),
+            )
+            .join(Order, Trade.id == Order.ft_trade_id)
+            .filter(
+                *filters,
+                Order.ft_order_side == case((Trade.is_short.is_(True), "sell"), else_="buy"),
+            )
+            # Order.filled.gt > 0
+            .group_by(Trade.pair)
+            .cte("pair_costs")
+        )
+        trades_grouped = (
+            select(
+                Trade.pair,
                 func.sum(Trade.close_profit_abs).label("profit_sum_abs"),
                 func.count(Trade.pair).label("count"),
             )
             .filter(*filters)
             .group_by(Trade.pair)
+            .cte("trades_grouped")
+        )
+        q = (
+            select(
+                trades_grouped.c.pair,
+                (trades_grouped.c.profit_sum_abs / pair_costs.c.cost_per_pair).label(
+                    "profit_ratio"
+                ),
+                trades_grouped.c.profit_sum_abs,
+                trades_grouped.c.count,
+            )
+            .join(pair_costs, trades_grouped.c.pair == pair_costs.c.pair)
             .order_by(desc("profit_sum_abs"))
-        ).all()
+        )
+        pair_rates = Trade.session.execute(q).all()
 
         return [
             {

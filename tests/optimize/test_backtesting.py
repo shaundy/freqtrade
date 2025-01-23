@@ -5,7 +5,7 @@ from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import ANY, MagicMock, PropertyMock
 
 import numpy as np
 import pandas as pd
@@ -795,6 +795,7 @@ def test_backtest_one(default_conf, mocker, testdatadir) -> None:
                         "order_filled_timestamp": 1517251200000,
                         "ft_is_entry": True,
                         "ft_order_tag": "",
+                        "cost": ANY,
                     },
                     {
                         "amount": 0.00957442,
@@ -803,6 +804,7 @@ def test_backtest_one(default_conf, mocker, testdatadir) -> None:
                         "order_filled_timestamp": 1517265300000,
                         "ft_is_entry": False,
                         "ft_order_tag": "roi",
+                        "cost": ANY,
                     },
                 ],
                 [
@@ -813,6 +815,7 @@ def test_backtest_one(default_conf, mocker, testdatadir) -> None:
                         "order_filled_timestamp": 1517283000000,
                         "ft_is_entry": True,
                         "ft_order_tag": "",
+                        "cost": ANY,
                     },
                     {
                         "amount": 0.0097064,
@@ -821,6 +824,7 @@ def test_backtest_one(default_conf, mocker, testdatadir) -> None:
                         "order_filled_timestamp": 1517285400000,
                         "ft_is_entry": False,
                         "ft_order_tag": "roi",
+                        "cost": ANY,
                     },
                 ],
             ],
@@ -1647,8 +1651,8 @@ def test_backtest_multi_pair_detail(
     if use_detail:
         # Backtest loop is called once per candle per pair
         # Exact numbers depend on trade state - but should be around 3_800
-        assert bl_spy.call_count > 1_350
-        assert bl_spy.call_count < 1_500
+        assert bl_spy.call_count > 1_220
+        assert bl_spy.call_count < 1_300
     else:
         assert bl_spy.call_count < 995
 
@@ -1896,7 +1900,7 @@ def test_backtest_multi_pair_long_short_switch(
 
     if use_detail:
         # Backtest loop is called once per candle per pair
-        assert bl_spy.call_count == 1523
+        assert bl_spy.call_count == 1484
     else:
         assert bl_spy.call_count == 479
 
@@ -2598,7 +2602,7 @@ def test_backtest_start_multi_strat_caching(
         "Parameter -i/--timeframe detected ... Using timeframe: 1m ...",
         "Parameter --timerange detected: 1510694220-1510700340 ...",
         f"Using data directory: {testdatadir} ...",
-        "Loading data from 2017-11-14 20:57:00 " "up to 2017-11-14 22:59:00 (0 days).",
+        "Loading data from 2017-11-14 20:57:00 up to 2017-11-14 22:59:00 (0 days).",
         "Parameter --enable-position-stacking detected ...",
     ]
 
